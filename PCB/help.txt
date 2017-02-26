@@ -1,0 +1,333 @@
+#include <mega32.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <delay.h>
+
+char ch[4], ms=0;
+unsigned int uss1=0, uss2=0;
+unsigned long int uss_inc=65536;
+unsigned int i=0, mot_spd=0;
+
+// External Interrupt 0 service routine
+interrupt [EXT_INT0] void ext_int0_isr(void)
+{
+  uss_inc=uss_inc/2;
+ if(uss_inc==32768){
+  uss1=0;
+ }
+ if(PIND.6){
+  uss1=uss1+uss_inc;
+ }
+ if(uss_inc==1){
+  uss_inc=65536;
+ }
+}
+
+// External Interrupt 1 service routine
+interrupt [EXT_INT1] void ext_int1_isr(void)
+{
+  uss_inc=uss_inc/2;
+ if(uss_inc==32768){
+  uss2=0;
+ }
+ if(PIND.6){
+  uss2=uss2+uss_inc;
+ }
+ if(uss_inc==1){
+  uss_inc=65536;
+ }
+}
+
+void main(void)
+{
+PORTA=0x00;
+DDRA=0x0F;
+
+PORTB=0x00;
+DDRB=0xFF;
+
+PORTC=0x3E;
+DDRC=0x01;
+
+PORTD=0x40;
+DDRD=0xB0;
+
+TCCR0=0x00;
+TCNT0=0x00;
+OCR0=0x00;
+
+TCCR1A=0xA2;
+TCCR1B=0x1B;
+TCNT1H=0x00;
+TCNT1L=0x00;
+ICR1H=0x0E;
+ICR1L=0xA6;
+OCR1AH=0x01;
+OCR1AL=0x18;
+OCR1BH=0x01;
+OCR1BL=0x18;
+
+ASSR=0x00;
+TCCR2=0x6D;
+TCNT2=0x00;
+OCR2=225;
+
+MCUCR=0x00;
+MCUCSR=0x00;
+
+TIMSK=0x00;
+
+GICR|=0xC0;
+MCUCR=0x0F;
+MCUCSR=0x00;
+GIFR=0xC0;
+
+UCSRA=0x00;
+UCSRB=0x18;
+UCSRC=0x86;
+UBRRH=0x00;
+UBRRL=0x4D;
+
+ACSR=0x80;
+SFIOR=0x00;
+
+#asm("sei")
+
+printf("connection ok\r");
+
+while (1)
+      {
+       if(UCSRA & (1<<RXC))
+       {
+          scanf("%s",&ch);
+          i=atoi(ch);
+       } 
+       
+       // Call to read ultrasonic data
+       
+       if(i==333){
+        PORTC.0=1;
+        delay_us(100);
+        PORTC.0=0;
+        delay_ms(1); // wait to read data from ultrasonic sound sensor
+        printf("%d\r",uss1);
+        delay_us(10);
+        printf("%d\r",uss2);
+        i=0;
+       }
+       
+       // Wheel rotation control
+       
+       if(i==101){
+        PORTA=0x00;
+        //printf("off\r");
+        i=0;
+        ms=0;
+        delay_ms(10);
+       }
+       
+       if(i==102){
+        PORTA.0=1;
+        PORTA.1=0;
+        PORTA.2=0;
+        PORTA.3=1;
+        //printf("forward\r");
+        i=0;
+        ms=1;
+        delay_ms(10);
+       }
+       
+       if(i==103){
+        PORTA.0=0;
+        PORTA.1=1;
+        PORTA.2=1;
+        PORTA.3=0;
+        //printf("reverse\r");
+        i=0;
+        ms=1;
+        delay_ms(10);
+       }
+       
+       if(i==104){
+        PORTA.0=0;
+        PORTA.1=1;
+        PORTA.2=0;
+        PORTA.3=1;
+        //printf("left\r");
+        i=0;
+        ms=1;
+        delay_ms(10);
+       }
+       
+       if(i==105){
+        PORTA.0=1;
+        PORTA.1=0;
+        PORTA.2=1;
+        PORTA.3=0;
+        //printf("right\r");
+        i=0;
+        ms=1;
+        delay_ms(10);
+       }
+       
+       // Wheel speed control
+       
+       if(i>=2000 && i<=2100){
+        mot_spd=2.55*(i-2000);
+        OCR2=mot_spd;
+        //printf("PWM ss\r");
+        i=0;
+        delay_ms(10);
+       }
+       
+         // Servo motor for Left hand
+
+         if(i>=4000 && i<=4180){
+          mot_spd = 563-(113+(1.872222*(i-4000))); 
+          OCR1A=mot_spd;
+          //printf("LS ss\r");
+          i=0;
+          delay_ms(10);
+         }
+         
+         // servo motor for Right hand
+         
+         if(i>=6000 && i<=6180){
+          mot_spd = 113+(1.872222*(i-6000));
+          OCR1B=mot_spd;
+          //printf("RS ss\r");
+          i=0;
+         }
+
+                 //led part start
+
+         if(i==10){
+          PORTB.0=1;
+          //printf("led1on\r");
+          i=0;
+         }
+       
+         if(i==11){
+          PORTB.0=0;
+          //printf("led1off\r");
+          i=0;
+        }
+
+         if(i==12){
+          PORTB.1=1;
+          //printf("led2on\r");
+          i=0;
+          delay_ms(10);
+         }
+         
+         if(i==13){
+          PORTB.1=0;
+          //printf("led2off\r");
+          i=0;
+        }
+
+         if(i==14){
+          PORTB.2=1;
+          //printf("led3on\r");
+          i=0;
+         }
+
+         if(i==15){
+          PORTB.2=0;
+          //printf("led3off\r");
+          i=0;
+         }
+
+         if(i==16){
+          PORTB.3=1;
+          //printf("led4on\r");
+          i=0;
+         }
+         
+         if(i==17){
+          PORTB.3=0;
+          //printf("led4off\r");
+          i=0;
+         }
+
+         if(i==18){
+          PORTB.4=1;
+          //printf("led5on\r");
+          i=0;
+         }
+
+         if(i==19){
+          PORTB.4=0;
+           //printf("led5off\r");
+           i=0;
+          }
+
+         if(i==20){
+          PORTB.5=1;
+          //printf("led6on\r");
+          i=0;
+         }
+
+         if(i==21){
+          PORTB.5=0;
+          //printf("led6off\r");
+          i=0;
+         }
+
+         if(i==22){
+          PORTB.6=1;
+          //printf("led7on\r");
+          i=0;
+         }
+
+         if(i==23){
+          PORTB.6=0;
+          //printf("led7off\r");
+          i=0;
+         }
+
+         if(i==24){
+          PORTB.7=1;
+          //printf("led8on\r");
+          i=0;
+         }
+
+         if(i==25){
+          PORTB.7=0;
+          //printf("led8off\r");
+          i=0;
+         }
+
+         if(i==26){
+          PORTB=0xFF;
+          //printf("ledallon\r");
+          i=0;
+         }
+         
+         if(i==27){
+          PORTB=0x00;
+          //printf("ledalloff\r");
+          i=0;
+         }
+         
+         if(!strcmp(ch,"help")){
+          printf("101 : Wheel off\r102 : Move forward\r103 : Move reverse\r104 : Left rotate\r105 : Right rotate\r");
+          printf("333 : Call for ultrasonic sound sensor data\rIt will give 2 data, 1st:Left <Delay 10us> 2nd:Right\r");
+          printf("2000 - 2100 : Wheel speed control\r");
+          printf("4000 - 4180 : Left Hand control\r");
+          printf("6000 - 6180 : Right Hand Control\r");
+          printf("10, 12, 14, 16, 18, 20, 22, 24 : LED-1:8 on command\r");
+          printf("11, 13, 15, 17, 19, 21, 23, 25 : LED-1:8 off command\r");
+          printf("26 : All LED on\r27 : All LED off");
+          sprintf(ch,"ok");
+          i=0;
+         }
+         
+         if(i){
+          printf("Invalid command\r");
+          i=0;
+         }
+       
+      }
+}
